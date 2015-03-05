@@ -25,7 +25,11 @@ log = logging.getLogger('yagd')
 log.addHandler(journal.JournalHandler(SYSLOG_IDENTIFIER='yagd'))
 log.setLevel(logging.INFO)
 
-COLORS = {'reset': '\x0f', 'yellow': '\x0307', 'green': '\x0303', 'bold': '\x02', 'red': '\x0305', 'cyan': '\x0310'}
+colors = {'reset': '\x0f', 'yellow': '\x0307', 'green': '\x0303', 'bold': '\x02', 'red': '\x0305', 'cyan': '\x0310'}
+commit_string = ("{green}{author}{reset} {repo}:{yellow}{branch}{reset} "
+                 "{bold}[{sha}]{reset}: {msg} {red}<{url}>{reset}")
+tag_string = ("{green}{pusher}{reset} {repo}: "
+              "{bold}[{sha}]{reset} tagged as {yellow}{tag}{reset}")
 
 def update_mirror(repo):
 	cd(basedir + repo + '.git')
@@ -48,31 +52,33 @@ def verify_signature(client_secret, raw_response, signature):
 	log.debug('Digest calculated:  {:s}'.format(digest))
 	return digest == signature
 
+def format_string(string, variables):
+	variables.update(colors)
+	return string.format(**variables)
+
 def format_commit(everything, commit):
 	short_url = shorten(commit["url"])
 	message = commit["message"].split("\n")[0][:80]
-	return ("{green}{author}{reset} {repo}:{yellow}{branch}{reset} "
-	        "{bold}[{sha}]{reset}: {msg} {red}<{url}>{reset}"
-	        ).format(
-	                 project = everything["repository"]["owner"]["name"],
-	                 repo    = everything["repository"]["name"],
-	                 branch  = everything["ref"].split("/")[-1],
-	                 author  = commit["author"]["username"],
-	                 sha     = commit["id"][:7],
-	                 msg     = message,
-	                 url     = short_url,
-	                 **COLORS)
+	variables = { 'project': everything["repository"]["owner"]["name"],
+	              'repo': everything["repository"]["name"],
+	              'branch': everything["ref"].split("/")[-1],
+	              'author': commit["author"]["username"],
+	              'sha': commit["id"][:7],
+	              'msg': message,
+	              'url': short_url }
+
+	return format_string(commit_string, variables)
 
 def format_tag(everything):
-	return ("{green}{pusher}{reset} {repo}: "
-	        "{bold}[{sha}]{reset} tagged as {yellow}{tag}{reset}"
-	        ).format(
-	                 project = everything["repository"]["owner"]["name"],
-	                 repo    = everything["repository"]["name"],
-	                 pusher  = everything["pusher"]["username"],
-	                 tag     = everything["ref"].split("/")[-1],
-	                 sha     = everything["head_commit"]["id"][:7],
-	                 **COLORS)
+	variables = {
+		'project': everything["repository"]["owner"]["name"],
+		'repo': everything["repository"]["name"],
+		'pusher': everything["pusher"]["username"],
+		'tag': everything["ref"].split("/")[-1],
+		'sha': everything["head_commit"]["id"][:7],
+	}
+
+	return format_string(tag_string, variables)
 
 def format_issue(everything):
 	short_url = shorten(everything['issue']['html_url'])
@@ -84,7 +90,7 @@ def format_issue(everything):
 		'title': everything['issue']['title'],
 		'url': short_url
 	}
-	variables.update(COLORS)
+	variables.update(colors)
 	message = '{green}{user}{reset} {repo} {cyan}issue #{number}{reset}'
 
 	if everything['action'] == 'labeled':
@@ -123,7 +129,7 @@ def format_pull_request(everything):
 		'title': everything['pull_request']['title'],
 		'url': short_url
 	}
-	variables.update(COLORS)
+	variables.update(colors)
 	message = '{green}{user}{reset} {repo} {cyan}PR #{number}{reset}'
 
 	if everything['action'] == 'labeled':
@@ -184,7 +190,7 @@ def process_blob(blob):
 		                   action = action,
 		                   repo   = blob['repository']['name'],
 		                   branch = blob['ref'].split('/')[-1],
-		                   **COLORS)
+		                   **colors)
 		send_to_irker(message, channels)
 
 	elif blob["forced"] == True:
@@ -194,7 +200,7 @@ def process_blob(blob):
 		                   pusher = blob['pusher']['name'],
 		                   repo   = blob['repository']['name'],
 		                   branch = blob['ref'].split('/')[-1],
-		                   **COLORS)
+		                   **colors)
 		send_to_irker(message, channels)
 
 	for commit in blob["commits"]:
