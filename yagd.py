@@ -213,38 +213,17 @@ def process_blob(blob):
 			traceback.print_exc()
 
 def handle_push(data):
-	user    = data['pusher']['name']
 	repo    = data['repository']['name']
-	repo_fn = data['repository']['full_name']
-	ref     = data['ref']
-	before  = data['before']
-	after   = data['after']
-	compare = data['compare']
-	forced  = data['forced']
 	process_blob(data)
 
 	if repo in repos:
 		update_mirror(repo)
 
 def handle_issue(data):
-	repo   = data['repository']['name']
-	user   = data['issue']['user']['login']
-	action = data['action']
-	number = data['issue']['number']
-	title  = data['issue']['title']
-	url    = data['issue']['html_url']
-
 	message = format_issue(data)
 	send_to_irker(message, channels)
 
 def handle_pull_request(data):
-	repo   = data['repository']['name']
-	user   = data['pull_request']['user']['login']
-	action = data['action']
-	number = data['number']
-	title  = data['pull_request']['title']
-	url    = data['pull_request']['html_url']
-
 	message = format_pull_request(data)
 	send_to_irker(message, channels)
 
